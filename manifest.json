@@ -1,0 +1,16 @@
+{
+  "name": "React Flow Side Panel",
+  "description": "Use a simple React Flow graph in the Chrome Side Panel.",
+  "version": "1.0",
+  "manifest_version": 3,
+  "permissions": ["sidePanel"],
+  "action": {
+    "default_title": "Open Side Panel"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
