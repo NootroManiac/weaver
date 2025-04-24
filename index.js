@@ -1,57 +1,43 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import React, { useEffect, useState } from 'react';
 import ReactFlow from 'reactflow';
 import 'reactflow/dist/style.css';
 
-const initialNodes = [
-  { id: '1', position: { x: 0, y: 0 }, data: { label: 'Node 1' }, type: 'default' },
-  { id: '2', position: { x: 100, y: 100 }, data: { label: 'Node 2' }, type: 'default' }
-];
-
-const initialEdges = [
-  { id: 'e1-2', source: '1', target: '2' }
-];
-
 function FlowPanel() {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      chrome.storage.local.get(['nodes', 'edges'], (data) => {
+        if (data.nodes && data.edges) {
+          const processedNodes = data.nodes.map((n) => ({
+            id: n.id,
+            position: { x: Math.random() * 500, y: Math.random() * 500 },
+            data: {
+              label: (
+                <div>
+                  {n.icon && <img src={n.icon} alt="icon" style={{ width: '16px', verticalAlign: 'middle', marginRight: 4 }} />}
+                  {n.title}
+                </div>
+              )
+            }
+          }));
+          setNodes(processedNodes);
+          setEdges(data.edges);
+        }
+      });
+    }, 1000); // refresh every second
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <ReactFlow nodes={initialNodes} edges={initialEdges} />
+    <div style={{ height: '100vh', width: '100vw' }}> {/* ✅ Fix: full-screen container */}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        fitView
+      />
     </div>
   );
 }
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<FlowPanel />);
-
-/* ===== File: webpack.config.js ===== */
-const path = require('path');
-
-module.exports = {
-  entry: './src/index.js',
-  output: {
-    path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js'
-  },
-  resolve: {
-    extensions: ['.js', '.jsx']
-  },
-  module: {
-    rules: [
-      {
-        test: /\.jsx?$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env', '@babel/preset-react']
-          }
-        }
-      },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader']
-      }
-    ]
-  },
-  mode: 'development'
-};

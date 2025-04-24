@@ -3,7 +3,7 @@
   "description": "Use a simple React Flow graph in the Chrome Side Panel.",
   "version": "1.0",
   "manifest_version": 3,
-  "permissions": ["sidePanel"],
+ "permissions": ["tabs", "activeTab", "storage","sidePanel"],
   "action": {
     "default_title": "Open Side Panel"
   },
