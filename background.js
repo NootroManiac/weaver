@@ -1,33 +1,37 @@
 let lastNodeId = null;
 let userCreatedTabs = [];
-let tabslist = []; // source of truth for the tabs 
 let num_of_nodes = 1; //index 
 let current_selected = 1; 
 let root_node = 1; 
+let tab_id_list = [];
+let isCommandPressed = false; 
 //define a boxes class 
 //find out a way to edit the connections part of the thing and also have it integrate with the react flow if possible 
-const nodes = [
+let tabslist = [ // source of truth for the tabs 
   {
     id: '1',
     position: { x: 0, y: 0 },
     data: { 
       tab_title: 'Hello', 
-      title: '',
       url: '',
       icon: '' || '',
       parentid: 1,
-      connections: []
+      tabid: 1, 
+      index: 1, 
+      connections: [] //array of node indexes 
      },
   },
 ];
+
 //add image, clickable url to data, and title 
 
 
 //This is the thing that opens the side bar
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((tab) => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-});
 
+});
+//WARNING: THIS MIGHT BREAK BECAUSE THESE MIGHT NOT BE MUTALLY EXCLUSIVE 
 //this checks for new tabs opened by the user 
 chrome.tabs.onCreated.addListener(tab => {
   // get the actual URL (pendingUrl for navigations in flight, otherwise url)
@@ -39,9 +43,27 @@ chrome.tabs.onCreated.addListener(tab => {
   // 2) tab.openerTabId === undefined → it wasn’t spawned in the background by another tab
   if (tab.active && tab.openerTabId === undefined) {
     chrome.runtime.sendMessage({ type: "NEW_TAB", url });
+    //create a node instance 
+    //edit the connections of the node to the current node 
+    num_of_nodes++;
+    tabslist.push({
+      id: String(num_of_nodes),
+      position: { x: 0, y: 0 },  //create editing system 
+      data: { 
+        tab_title: tab.title, 
+        url: tab.url,
+        icon: tab.favIconUrl || '',
+        parentid: current_selected,
+        tabid: tabid, 
+        connections: [] //array of node indexes 
+       },
+    },)
+    //edit the connections of the node to the current node 
+
   }
 });
 /*
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url.startsWith('http')) {
     const site = {
@@ -51,6 +73,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       icon: tab.favIconUrl || '',
       parent: lastNodeId
     };
+
 
     chrome.storage.local.get({ nodes: [], edges: [] }, ({ nodes, edges }) => {
       nodes.push(site);
@@ -90,23 +113,56 @@ chrome.tabs.onCreated.addListener((tab) => {
               title: updatedTab.title || ''
             });
             console.log("User-created background tab added:", updatedTab.url);
+            
           }
+          num_of_nodes++;
+          tabslist.push({
+            id: String(num_of_nodes),
+            position: { x: 0, y: 0 },  //create editing system 
+            data: { 
+              tab_title: tab.title, 
+              url: tab.url,
+              icon: tab.favIconUrl || '',
+              parentid: current_selected,
+              tabid: tabid, 
+              connections: [] //array of node indexes 
+             },
+          },)
         }
       });
+
     }, 500); // Allow Chrome to set the URL
+
   }
 });
 //On command create new tab 
 function openNewTab() {
   chrome.tabs.create({}, (tab) => {
     console.log("Opened new tab:", tab);
+    //push a node 
+    num_of_nodes++;
+    tabslist.push({
+      id: String(num_of_nodes),
+      position: { x: 0, y: 0 },  //create editing system 
+      data: { 
+        tab_title: tab.title, 
+        url: tab.url,
+        icon: tab.favIconUrl || '',
+        parentid: current_selected,
+        tabid: tabid, 
+        connections: [] //array of node indexes 
+       },
+    },)
+    isCommandPressed = false; 
   });
 }
 
-// Listen for the keyboard command defined in manifest.json
+// Listen for the keyboard command defined in manifest.json//
 chrome.commands.onCommand.addListener((command) => {
   if (command === "open-new-tab") {
+    isCommandPressed = true; 
     openNewTab();
+    
   }
 });
 // This is how the index.js gets the tabs
@@ -116,4 +172,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 //implement bfs/ position editor 
-//implement current tab tracker 
+
+//implement current tab tracker
+
+//implement tab history manager
