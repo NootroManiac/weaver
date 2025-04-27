@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge, } from 'react';
 import ReactFlow from 'reactflow';
 import 'reactflow/dist/style.css';
+import dagre from 'dagre';
 
-chrome.runtime.sendMessage({ type: "GET_TABS" }, (response) => {
-  console.log("Tab list:", response.tabList);
-});
-let nodes = response.tabList; 
 //edit the initialNodes with the data from the nodes list 
 //so either make a constructor and add node data types to this list 
 //listen from messages from background.js about updates to the tab list 
@@ -16,19 +18,19 @@ const initialNodes = [
     position: { x: 0, y: 0 },
     type: 'input',
   },
-  {
-    id: '2',
-    data: { label: 'World' },
-    position: { x: 100, y: 100 },
-  },
 ];
  
 const initialEdges = [
-  { id: '1-2', source: '1', target: '2', label: 'to the', type: 'step' },
+  //{ id: '1-2', source: '1', target: '2', label: 'to the', type: 'step' },
 ];
+
 //todo 
 //implement a initial edges constructor using the data from the nodes 
-
+chrome.runtime.sendMessage({ type: "GET_TABS" }, (response) => {
+  console.log("Tab list:", response.tabList);
+  initialNodes = response.tabList; 
+  initialEdges
+});
 function FlowPanel() {
   console.log("User-created background tab added:", updatedTab.url);
   const [nodes, setNodes] = useState([]);

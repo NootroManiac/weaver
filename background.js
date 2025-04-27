@@ -31,6 +31,8 @@ chrome.runtime.onInstalled.addListener((tab) => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 });
+
+
 //WARNING: THIS MIGHT BREAK BECAUSE THESE MIGHT NOT BE MUTALLY EXCLUSIVE 
 //this checks for new tabs opened by the user 
 chrome.tabs.onCreated.addListener(tab => {
@@ -172,7 +174,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 //implement bfs/ position editor 
-
+//source node and connection behavior defined by force link 
+//random node to node behavior defined by the force function
+//make them detect nearby node and be repeled by them 
 //implement current tab tracker
 
+//logic if the current focus tab is equal to the saved tab id, then that is the current tabs index in the array 
 //implement tab history manager
