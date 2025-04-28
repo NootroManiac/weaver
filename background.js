@@ -2,29 +2,44 @@ let lastNodeId = null;
 let userCreatedTabs = [];
 let num_of_nodes = 1; //index 
 let current_selected = 1; 
+let parentId = 1; 
 let root_node = 1; 
 let tab_id_list = [];
 let isCommandPressed = false; 
 //define a boxes class 
 //find out a way to edit the connections part of the thing and also have it integrate with the react flow if possible 
-let tabslist = [ // source of truth for the tabs 
-  {
-    id: '1',
+let nodeslist = [ // source of truth for the tabs 
+
+    {
+    id: '1', //is this the tabid 
     position: { x: 0, y: 0 },
     data: { 
       tab_title: 'Hello', 
       url: '',
       icon: '' || '',
       parentid: 1,
-      tabid: 1, 
+      tabid: 1, //or is this the tabid
       index: 1, 
       connections: [] //array of node indexes 
      },
   },
-];
 
+];
+//each window has their own nodes list
+//maybe implement a window data type 
+let edgesList = []; 
 //add image, clickable url to data, and title 
 
+function broadcastGraphUpdate() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    for (let tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'UPDATE_GRAPH',
+        payload: { nodes: nodesList, edges: edgesList },
+      });
+    }
+  });
+}
 
 //This is the thing that opens the side bar
 chrome.runtime.onInstalled.addListener((tab) => {
@@ -48,20 +63,45 @@ chrome.tabs.onCreated.addListener(tab => {
     //create a node instance 
     //edit the connections of the node to the current node 
     num_of_nodes++;
-    tabslist.push({
+    nodeslist.push({
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
       data: { 
         tab_title: tab.title, 
         url: tab.url,
         icon: tab.favIconUrl || '',
-        parentid: current_selected,
+        parentid: parentId,
         tabid: tabid, 
         connections: [] //array of node indexes 
        },
     },)
+    nodeslist[parentId].data.connections.push(String(num_of_nodes))
     //edit the connections of the node to the current node 
-
+    //MAKJOEAJFD window specific later
+    const edgeIds = new Set();
+    
+    nodeslist.forEach((node) => {
+      nodeslist.data.connections.forEach(targetIndex => {
+        const targetNode = nodes[targetIndex];
+        if (!targetNode) return;
+    
+        // build a unique edge id
+        const edgeId = `e${node.id}-${targetNode.id}`;
+    
+        // only add if we haven't seen it before
+        if (!edgeIds.has(edgeId)) {
+          edgeIds.add(edgeId);
+          edgesList.push({
+            id: edgeId,
+            source: node.id,
+            target: targetNode.id,
+            type: 'smoothstep',   // optional style
+            animated: true        // optional animation
+          });
+        }
+      });
+    });
+    broadcastGraphUpdate();  
   }
 });
 /*
@@ -118,18 +158,49 @@ chrome.tabs.onCreated.addListener((tab) => {
             
           }
           num_of_nodes++;
-          tabslist.push({
+          nodeslist.push({
             id: String(num_of_nodes),
             position: { x: 0, y: 0 },  //create editing system 
             data: { 
               tab_title: tab.title, 
               url: tab.url,
               icon: tab.favIconUrl || '',
-              parentid: current_selected,
+              parentid: parentId,
               tabid: tabid, 
               connections: [] //array of node indexes 
              },
           },)
+
+
+          nodeslist[parentId].data.connections.push(String(num_of_nodes))
+          //edit the connections of the node to the current node 
+          //MAKJOEAJFD window specific later
+          const edgeIds = new Set();
+          
+          nodeslist.forEach((node) => {
+            nodeslist.data.connections.forEach(targetIndex => {
+              const targetNode = nodes[targetIndex];
+              if (!targetNode) return;
+          
+              // build a unique edge id
+              const edgeId = `e${node.id}-${targetNode.id}`;
+          
+              // only add if we haven't seen it before
+              if (!edgeIds.has(edgeId)) {
+                edgeIds.add(edgeId);
+                edgesList.push({
+                  id: edgeId,
+                  source: node.id,
+                  target: targetNode.id,
+                  type: 'smoothstep',   // optional style
+                  animated: true        // optional animation
+                });
+              }
+            });
+          });
+          broadcastGraphUpdate();  
+
+
         }
       });
 
@@ -143,18 +214,45 @@ function openNewTab() {
     console.log("Opened new tab:", tab);
     //push a node 
     num_of_nodes++;
-    tabslist.push({
+    nodeslist.push({
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
       data: { 
         tab_title: tab.title, 
         url: tab.url,
         icon: tab.favIconUrl || '',
-        parentid: current_selected,
+        parentid: parentId,
         tabid: tabid, 
         connections: [] //array of node indexes 
        },
     },)
+    nodeslist[parentId].data.connections.push(String(num_of_nodes))
+    //edit the connections of the node to the current node 
+    //MAKJOEAJFD window specific later
+    const edgeIds = new Set();
+    
+    nodeslist.forEach((node) => {
+      nodeslist.data.connections.forEach(targetIndex => {
+        const targetNode = nodes[targetIndex];
+        if (!targetNode) return;
+    
+        // build a unique edge id
+        const edgeId = `e${node.id}-${targetNode.id}`;
+    
+        // only add if we haven't seen it before
+        if (!edgeIds.has(edgeId)) {
+          edgeIds.add(edgeId);
+          edgesList.push({
+            id: edgeId,
+            source: node.id,
+            target: targetNode.id,
+            type: 'smoothstep',   // optional style
+            animated: true        // optional animation
+          });
+        }
+      });
+    });
+    broadcastGraphUpdate();  
     isCommandPressed = false; 
   });
 }
@@ -164,7 +262,7 @@ chrome.commands.onCommand.addListener((command) => {
   if (command === "open-new-tab") {
     isCommandPressed = true; 
     openNewTab();
-    
+    broadcastGraphUpdate();  
   }
 });
 // This is how the index.js gets the tabs
@@ -173,11 +271,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ tabList });
   }
 });
-//implement bfs/ position editor 
-//source node and connection behavior defined by force link 
-//random node to node behavior defined by the force function
-//make them detect nearby node and be repeled by them 
+
 //implement current tab tracker
+chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
+  // tabId = ID of the newly active tab
+  // windowId = ID of the window containing that tab
+  // windowspecific 
+  // wait 
+  chrome.tabs.get(tabId, (tab) => {
+    console.log('Switched to tab:', tabId);
+    console.log('URL is now:', tab.url);
+    console.log('Title:', tab.title);
+    // …do whatever you need with the new active tab
+  });
+
+  setTimeout(() => {
+    for (let i = 0; i < nodeslist.length; i++) {
+      const node = nodeslist[i];
+      if (node.data.tabid === tabId) {
+        console.log(`Found a match at index ${i}:`, node);
+        parentId = i;
+      }
+    }
+  }, 100); // ← adjust delay here
+});
 
 //logic if the current focus tab is equal to the saved tab id, then that is the current tabs index in the array 
 //implement tab history manager
