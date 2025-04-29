@@ -53,6 +53,7 @@ const initialEdges = [
 
 export function getLayoutedElements(origNodes, origEdges, direction = 'TB') {
   // 1) Build a fresh Dagre graph each time
+
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: direction });
@@ -67,11 +68,17 @@ export function getLayoutedElements(origNodes, origEdges, direction = 'TB') {
 
   // 3) Run the layout algorithm
   dagre.layout(g);
-
+  // After dagre.layout(g);
+  console.log('Dagre layout nodes:', g.nodes().map((id) => g.node(id)));
   const isHorizontal = direction === 'LR';
 
   // 4) Map to brand-new node objects (no in-place mutation)
   const layoutedNodes = origNodes.map((n) => {
+    const dagreNode = g.node(n.id);
+    if (!dagreNode) {
+      console.warn(`Node with id ${n.id} not found in Dagre graph.`);
+      return n;
+    }
     const { x, y } = g.node(n.id);
     return {
       ...n,
@@ -83,7 +90,7 @@ export function getLayoutedElements(origNodes, origEdges, direction = 'TB') {
       targetPosition: isHorizontal ? 'left' : 'top',
     };
   });
-
+  console.log('Layouted Nodes:', layoutedNodes);
   // 5) You can return a tuple for clarity
   return [layoutedNodes, origEdges];
 }
@@ -126,14 +133,16 @@ export default function LayoutFlow() {
 
   useEffect(() => {
     const listener = (message) => {
+      console.group('[LayoutFlow] Incoming UPDATE_GRAPH');
       if (message.type === 'UPDATE_GRAPH') {
         const { nodes: newNodes, edges: newEdges } = message.payload;
-        updateFlow({ nodes: newNodes, edges: newEdges });
-        console.group('[LayoutFlow] Incoming UPDATE_GRAPH');
+        const [layoutedNodes, layoutedEdges] = getLayoutedElements(newNodes, newEdges, 'TB');
+        updateFlow({ nodes: layoutedNodes, edges: layoutedEdges });
         console.log('message received');        
         console.log('Nodes (%d):', newNodes.length, newNodes);
         console.log('Edges (%d):', newEdges.length, newEdges);
         console.groupEnd();
+        
       }
     };
     chrome.runtime.onMessage.addListener(listener);
