@@ -31,17 +31,16 @@ let edgeslist = [];
 //add image, clickable url to data, and title 
 
 function broadcastGraphUpdate() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    for (let tab of tabs) {
-      chrome.runtime.sendMessage({
-        action: 'UPDATE_GRAPH',
-        payload: { nodes: nodeslist, edges: edgeslist },
-      });
-      console.log("User-created background tab added:", nodeslist, edgeslist);
-      console.log('[broadcastGraphUpdate] nodes (%d):', nodeslist.length, nodeslist);
-      console.log('[broadcastGraphUpdate] edges (%d):', edgeslist.length, edgeslist);
-    }
-  });
+  //chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  //});
+  chrome.runtime.sendMessage({
+    type: 'UPDATE_GRAPH',
+    payload: { nodes: nodeslist, edges: edgeslist },
+
+  })
+  console.log("User-created background tab added:", nodeslist, edgeslist);
+  console.log('[broadcastGraphUpdate] nodes (%d):', nodeslist.length, nodeslist);
+  console.log('[broadcastGraphUpdate] edges (%d):', edgeslist.length, edgeslist);
 }
 
 //This is the thing that opens the side bar
@@ -61,7 +60,7 @@ chrome.tabs.onCreated.addListener(tab => {
   // only count “real” user-opened tabs:
   // 1) tab.active === true  → it’s immediately shown to the user  
   // 2) tab.openerTabId === undefined → it wasn’t spawned in the background by another tab
-  if (tab.active && tab.openerTabId === undefined) {
+  if (tab.active && tab.openerTabId === undefined && tab.url !== 'about:blank') {
     const tabTitle = tab.title || 'Untitled';
     const tabUrl = tab.url || 'about:blank';
     const tabIcon = tab.favIconUrl || '';
@@ -70,6 +69,7 @@ chrome.tabs.onCreated.addListener(tab => {
     //edit the connections of the node to the current node 
     console.log("before added for general tab adder", nodeslist, edgeslist);
     num_of_nodes++;
+    console.log("after node push for tab adder",num_of_nodes);
     nodeslist.push({
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
@@ -147,7 +147,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onCreated.addListener((tab) => {
   // Only proceed if it's not active (i.e., opened in background)
   console.log("initial ", nodeslist, edgeslist);
-  if (!tab.active && !tab.openerTabId && tab.pendingUrl) {
+  if (!tab.active && !tab.openerTabId && tab.pendingUrl && tab.url !== 'about:blank') {
     // Defer briefly to allow URL to load
     console.log("pass first check for pending ", nodeslist, edgeslist);
     setTimeout(() => {
@@ -183,7 +183,7 @@ chrome.tabs.onCreated.addListener((tab) => {
               connections: [] //array of node indexes 
              },
           },)
-          console.log("passed node push");
+          console.log("passed node push background");
 
           nodeslist[parentId].data.connections.push(String(num_of_nodes))
           //edit the connections of the node to the current node 
@@ -250,27 +250,12 @@ chrome.tabs.onCreated.addListener((tab) => {
 //On command create new tab 
 function openNewTab() {
   chrome.tabs.create({}, (tab) => {
-    if (tab.openerTabId !== undefined) {
-      console.log("Filtered out non-user-created tab:", tab);
+    if (tab.openerTabId !== undefined || tab.url === 'about:blank') {
+      console.log("Filtered out non-user-created or default tab:", tab);
       return;
     }
 
     console.log("Opened new tab:", tab);
-    //push a node 
-    num_of_nodes++;
-    nodeslist.push({
-      id: String(num_of_nodes),
-      position: { x: 0, y: 0 },  //create editing system 
-      data: { 
-        tab_title: tab.title, 
-        url: tab.url,
-        icon: tab.favIconUrl || '',
-        parentid: parentId,
-        tabid: tab.id, 
-        connections: [] //array of node indexes 
-       },
-    },)
-    nodeslist[parentId].data.connections.push(String(num_of_nodes))
     //edit the connections of the node to the current node 
     //MAKJOEAJFD window specific later
     const tabTitle = tab.title || 'Untitled';
@@ -362,6 +347,7 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
       if (node.data.tabid === tabId) {
         console.log(`Found a match at index ${i}:`, node);
         parentId = i;
+
       }
     }
   }, 100); // ← adjust delay here
