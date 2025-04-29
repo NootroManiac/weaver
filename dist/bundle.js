@@ -43685,8 +43685,15 @@ function LayoutFlow() {
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     var listener = function listener(message) {
       if (message.type === 'UPDATE_GRAPH') {
-        updateFlow(message.payload);
-        console.group('[FlowSidebar] Incoming UPDATE_GRAPH');
+        var _message$payload = message.payload,
+          newNodes = _message$payload.nodes,
+          newEdges = _message$payload.edges;
+        updateFlow({
+          nodes: newNodes,
+          edges: newEdges
+        });
+        console.group('[LayoutFlow] Incoming UPDATE_GRAPH');
+        console.log('message received');
         console.log('Nodes (%d):', newNodes.length, newNodes);
         console.log('Edges (%d):', newEdges.length, newEdges);
         console.groupEnd();

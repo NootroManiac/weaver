@@ -1,11 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback  } from 'react';
 import ReactFlow, {
+  ReactFlowProvider,
+  useReactFlow, 
   MiniMap,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
-  addEdge
+  addEdge,
+  ReactFlowInstance,
+  applyNodeChanges,
+  applyEdgeChanges,
+  NodeChange,
+  EdgeChange,
+  OnConnectParams,
+  Node,
+  Edge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
@@ -84,49 +94,52 @@ export function getLayoutedElements(origNodes, origEdges, direction = 'TB') {
 
 
 export default function LayoutFlow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [nodeId, setNodeId] = useState(2);
-  const [layoutDir, setLayoutDir] = useState('TB');
+  const [nodes, setNodes] = useState(initialNodes);
+  const [edges, setEdges] = useState(initialEdges);
+  const instanceRef = useRef(null);
 
-  useEffect(() => {
-    const [layoutedNodes, layoutedEdges] = getLayoutedElements(
-      nodes,
-      edges,
-      layoutDir
-    );
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+  const onInit = useCallback((instance) => {
+    instanceRef.current = instance;
   }, []);
 
+  const onNodesChange = useCallback((changes) => {
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
+
+  const onEdgesChange = useCallback((changes) => {
+    setEdges((eds) => applyEdgeChanges(changes, eds));
+  }, []);
+
+  const onConnect = useCallback((params) => {
+    setEdges((eds) => addEdge(params, eds));
+  }, []);
+
+  const updateFlow = useCallback(({ nodes: newNodes, edges: newEdges }) => {
+    if (instanceRef.current) {
+      instanceRef.current.setNodes(newNodes);
+      instanceRef.current.setEdges(newEdges);
+      instanceRef.current.fitView({ padding: 0.2 });
+    }
+    setNodes(newNodes);
+    setEdges(newEdges);
+  }, []);
 
   useEffect(() => {
-    function handleMessage(message, sender, sendResponse) {
-      if (message.action === 'UPDATE_GRAPH') {
+    const listener = (message) => {
+      if (message.type === 'UPDATE_GRAPH') {
         const { nodes: newNodes, edges: newEdges } = message.payload;
-        const [layoutedNodes, layoutedEdges] = getLayoutedElements(
-          newNodes,
-          newEdges,
-          layoutDir
-        );
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        sendResponse({ status: 'OK' });
+        updateFlow({ nodes: newNodes, edges: newEdges });
+        console.group('[LayoutFlow] Incoming UPDATE_GRAPH');
+        console.log('message received');        
+        console.log('Nodes (%d):', newNodes.length, newNodes);
+        console.log('Edges (%d):', newEdges.length, newEdges);
+        console.groupEnd();
       }
-      //  Return true if you’ll call sendResponse asynchronously:
-      return true;
-    }
-
-  chrome.runtime.onMessage.addListener(handleMessage);
-    return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage);
     };
-  }, [layoutDir, setNodes, setEdges]);
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, [updateFlow]);
 
-  const onConnect = (params) => {
-    setEdges((eds) => addEdge(params, eds));
-  };
-  
 /*
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -181,6 +194,7 @@ export default function LayoutFlow() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onInit={onInit}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

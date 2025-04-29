@@ -27,16 +27,19 @@ let nodeslist = [ // source of truth for the tabs
 ];
 //each window has their own nodes list
 //maybe implement a window data type 
-let edgesList = []; 
+let edgeslist = []; 
 //add image, clickable url to data, and title 
 
 function broadcastGraphUpdate() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     for (let tab of tabs) {
-      chrome.tabs.sendMessage(tab.id, {
+      chrome.runtime.sendMessage({
         action: 'UPDATE_GRAPH',
-        payload: { nodes: nodesList, edges: edgesList },
+        payload: { nodes: nodeslist, edges: edgeslist },
       });
+      console.log("User-created background tab added:", nodeslist, edgeslist);
+      console.log('[broadcastGraphUpdate] nodes (%d):', nodeslist.length, nodeslist);
+      console.log('[broadcastGraphUpdate] edges (%d):', edgeslist.length, edgeslist);
     }
   });
 }
@@ -54,35 +57,42 @@ chrome.tabs.onCreated.addListener(tab => {
   // get the actual URL (pendingUrl for navigations in flight, otherwise url)
   const url = tab.pendingUrl || tab.url;
   if (!url) return;
-
+  console.log("passed first check", nodeslist, edgeslist);
   // only count “real” user-opened tabs:
   // 1) tab.active === true  → it’s immediately shown to the user  
   // 2) tab.openerTabId === undefined → it wasn’t spawned in the background by another tab
   if (tab.active && tab.openerTabId === undefined) {
-    chrome.runtime.sendMessage({ type: "NEW_TAB", url });
+    const tabTitle = tab.title || 'Untitled';
+    const tabUrl = tab.url || 'about:blank';
+    const tabIcon = tab.favIconUrl || '';
+
     //create a node instance 
     //edit the connections of the node to the current node 
+    console.log("before added for general tab adder", nodeslist, edgeslist);
     num_of_nodes++;
     nodeslist.push({
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
       data: { 
-        tab_title: tab.title, 
-        url: tab.url,
-        icon: tab.favIconUrl || '',
+        tab_title: tabTitle, 
+        url: tabUrl,
+        icon: tabIcon,
         parentid: parentId,
-        tabid: tabid, 
+        tabid: tab.id, 
         connections: [] //array of node indexes 
        },
     },)
-    nodeslist[parentId].data.connections.push(String(num_of_nodes))
+    console.log("after node push for tab adder", nodeslist, edgeslist);
+    if (nodeslist[parentId]) {
+      nodeslist[parentId].data.connections.push(String(num_of_nodes));
+    }
     //edit the connections of the node to the current node 
     //MAKJOEAJFD window specific later
     const edgeIds = new Set();
     
     nodeslist.forEach((node) => {
-      nodeslist.data.connections.forEach(targetIndex => {
-        const targetNode = nodes[targetIndex];
+      node.data.connections.forEach(targetIndex => { // Corrected here
+        const targetNode = nodeslist[targetIndex]; // Ensure nodeslist is used
         if (!targetNode) return;
     
         // build a unique edge id
@@ -91,7 +101,7 @@ chrome.tabs.onCreated.addListener(tab => {
         // only add if we haven't seen it before
         if (!edgeIds.has(edgeId)) {
           edgeIds.add(edgeId);
-          edgesList.push({
+          edgeslist.push({
             id: edgeId,
             source: node.id,
             target: targetNode.id,
@@ -101,6 +111,7 @@ chrome.tabs.onCreated.addListener(tab => {
         }
       });
     });
+    console.log("User-created background tab added:", nodeslist, edgeslist);
     broadcastGraphUpdate();  
   }
 });
@@ -135,8 +146,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Filter tabs the user opens (not scripts/popups/etc.)
 chrome.tabs.onCreated.addListener((tab) => {
   // Only proceed if it's not active (i.e., opened in background)
+  console.log("initial ", nodeslist, edgeslist);
   if (!tab.active && !tab.openerTabId && tab.pendingUrl) {
     // Defer briefly to allow URL to load
+    console.log("pass first check for pending ", nodeslist, edgeslist);
     setTimeout(() => {
       chrome.tabs.get(tab.id, (updatedTab) => {
         if (
@@ -154,7 +167,7 @@ chrome.tabs.onCreated.addListener((tab) => {
               url: updatedTab.url,
               title: updatedTab.title || ''
             });
-            console.log("User-created background tab added:", updatedTab.url);
+            console.log("already tracked condition met" ,updatedTab.url);
             
           }
           num_of_nodes++;
@@ -166,20 +179,46 @@ chrome.tabs.onCreated.addListener((tab) => {
               url: tab.url,
               icon: tab.favIconUrl || '',
               parentid: parentId,
-              tabid: tabid, 
+              tabid: tab.id, 
               connections: [] //array of node indexes 
              },
           },)
-
+          console.log("passed node push");
 
           nodeslist[parentId].data.connections.push(String(num_of_nodes))
+          //edit the connections of the node to the current node 
+          //MAKJOEAJFD window specific later
+          const tabTitle = tab.title || 'Untitled';
+          const tabUrl = tab.url || 'about:blank';
+          const tabIcon = tab.favIconUrl || '';
+
+          //create a node instance 
+          //edit the connections of the node to the current node 
+          console.log("before added for general tab adder", nodeslist, edgeslist);
+          num_of_nodes++;
+          nodeslist.push({
+            id: String(num_of_nodes),
+            position: { x: 0, y: 0 },  //create editing system 
+            data: { 
+              tab_title: tabTitle, 
+              url: tabUrl,
+              icon: tabIcon,
+              parentid: parentId,
+              tabid: tab.id, 
+              connections: [] //array of node indexes 
+             },
+          },)
+          console.log("after node push for tab adder", nodeslist, edgeslist);
+          if (nodeslist[parentId]) {
+            nodeslist[parentId].data.connections.push(String(num_of_nodes));
+          }
           //edit the connections of the node to the current node 
           //MAKJOEAJFD window specific later
           const edgeIds = new Set();
           
           nodeslist.forEach((node) => {
-            nodeslist.data.connections.forEach(targetIndex => {
-              const targetNode = nodes[targetIndex];
+            node.data.connections.forEach(targetIndex => { // Corrected here
+              const targetNode = nodeslist[targetIndex]; // Ensure nodeslist is used
               if (!targetNode) return;
           
               // build a unique edge id
@@ -188,7 +227,7 @@ chrome.tabs.onCreated.addListener((tab) => {
               // only add if we haven't seen it before
               if (!edgeIds.has(edgeId)) {
                 edgeIds.add(edgeId);
-                edgesList.push({
+                edgeslist.push({
                   id: edgeId,
                   source: node.id,
                   target: targetNode.id,
@@ -199,7 +238,7 @@ chrome.tabs.onCreated.addListener((tab) => {
             });
           });
           broadcastGraphUpdate();  
-
+          
 
         }
       });
@@ -211,6 +250,11 @@ chrome.tabs.onCreated.addListener((tab) => {
 //On command create new tab 
 function openNewTab() {
   chrome.tabs.create({}, (tab) => {
+    if (tab.openerTabId !== undefined) {
+      console.log("Filtered out non-user-created tab:", tab);
+      return;
+    }
+
     console.log("Opened new tab:", tab);
     //push a node 
     num_of_nodes++;
@@ -222,18 +266,44 @@ function openNewTab() {
         url: tab.url,
         icon: tab.favIconUrl || '',
         parentid: parentId,
-        tabid: tabid, 
+        tabid: tab.id, 
         connections: [] //array of node indexes 
        },
     },)
     nodeslist[parentId].data.connections.push(String(num_of_nodes))
     //edit the connections of the node to the current node 
     //MAKJOEAJFD window specific later
+    const tabTitle = tab.title || 'Untitled';
+    const tabUrl = tab.url || 'about:blank';
+    const tabIcon = tab.favIconUrl || '';
+
+    //create a node instance 
+    //edit the connections of the node to the current node 
+    console.log("before added for general tab adder", nodeslist, edgeslist);
+    num_of_nodes++;
+    nodeslist.push({
+      id: String(num_of_nodes),
+      position: { x: 0, y: 0 },  //create editing system 
+      data: { 
+        tab_title: tabTitle, 
+        url: tabUrl,
+        icon: tabIcon,
+        parentid: parentId,
+        tabid: tab.id, 
+        connections: [] //array of node indexes 
+       },
+    },)
+    console.log("after node push for tab adder", nodeslist, edgeslist);
+    if (nodeslist[parentId]) {
+      nodeslist[parentId].data.connections.push(String(num_of_nodes));
+    }
+    //edit the connections of the node to the current node 
+    //MAKJOEAJFD window specific later
     const edgeIds = new Set();
     
     nodeslist.forEach((node) => {
-      nodeslist.data.connections.forEach(targetIndex => {
-        const targetNode = nodes[targetIndex];
+      node.data.connections.forEach(targetIndex => { // Corrected here
+        const targetNode = nodeslist[targetIndex]; // Ensure nodeslist is used
         if (!targetNode) return;
     
         // build a unique edge id
@@ -242,7 +312,7 @@ function openNewTab() {
         // only add if we haven't seen it before
         if (!edgeIds.has(edgeId)) {
           edgeIds.add(edgeId);
-          edgesList.push({
+          edgeslist.push({
             id: edgeId,
             source: node.id,
             target: targetNode.id,
@@ -253,6 +323,7 @@ function openNewTab() {
       });
     });
     broadcastGraphUpdate();  
+    
     isCommandPressed = false; 
   });
 }
