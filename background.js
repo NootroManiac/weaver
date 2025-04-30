@@ -81,7 +81,7 @@ chrome.tabs.onCreated.addListener(tab => {
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
       data: { 
-        tab_title: tabTitle, 
+        label: tabTitle, 
         url: tabUrl,
         icon: tabIcon,
         parentid: parentId,
@@ -188,7 +188,7 @@ chrome.tabs.onCreated.addListener((tab) => {
             id: String(num_of_nodes),
             position: { x: 0, y: 0 },  //create editing system 
             data: { 
-              tab_title: tabTitle, 
+              label: tabTitle, 
               url: tabUrl,
               icon: tabIcon,
               parentid: parentId,
@@ -226,7 +226,6 @@ chrome.tabs.onCreated.addListener((tab) => {
             });
           });
           broadcastGraphUpdate();  
-
         }
       });
 
@@ -259,7 +258,7 @@ function openNewTab() {
       id: String(num_of_nodes),
       position: { x: 0, y: 0 },  //create editing system 
       data: { 
-        tab_title: tabTitle, 
+        label: tabTitle, 
         url: tabUrl,
         icon: tabIcon,
         parentid: parentId,
