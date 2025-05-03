@@ -8,124 +8,121 @@ let tab_id_list = [];
 let isCommandPressed = false; 
 //define a boxes class 
 //find out a way to edit the connections part of the thing and also have it integrate with the react flow if possible
+let windowData = {};
+function initializeWindowData(windowId) {
+  if (!windowData[windowId]) {
+    windowData[windowId] = {
+      nodeslist: [],
+      edgeslist: [],
+      windowId: windowId
+    };
+  }
+}
+
 let programmaticallyCreatedTabs = new Set(); 
-let nodeslist = [ // source of truth for the tabs 
 
-    {
-    id: '1', //is this the tabid 
-    position: { x: 0, y: 0 },
-    data: { 
-      tab_title: 'Hello', 
-      url: '',
-      icon: '' || '',
-      parentid: 1,
-      tabid: 1, //or is this the tabid
-      index: 1, 
-      connections: [] //array of node indexes 
-     },
-  },
-
-];
 //each window has their own nodes list
 //maybe implement a window data type 
-let edgeslist = []; 
 //add image, clickable url to data, and title 
 
-function broadcastGraphUpdate() {
-  //chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-  //});
+function broadcastGraphUpdate(windowId) {
+  if (!windowData[windowId]) return;
+
+  const { nodeslist, edgeslist } = windowData[windowId];
   chrome.runtime.sendMessage({
     type: 'UPDATE_GRAPH',
     payload: { nodes: nodeslist, edges: edgeslist },
-
-  })
-  console.log("User-created background tab added:", nodeslist, edgeslist);
-  console.log('[broadcastGraphUpdate] nodes (%d):', nodeslist.length, nodeslist);
-  console.log('[broadcastGraphUpdate] edges (%d):', edgeslist.length, edgeslist);
-}
-
-function AnAc(tab){ // adds nodes and connection to the global list
-  const tabTitle = tab.title || 'Untitled';
-  const tabUrl = tab.url || 'about:blank';
-  const tabIcon = tab.favIconUrl || '';
-
-  //create a node instance 
-  //edit the connections of the node to the current node 
-  console.log("before added for 2nd", nodeslist, edgeslist);
-  num_of_nodes++;
-  nodeslist.push({
-    id: String(num_of_nodes),
-    position: { x: 0, y: 0 },  //create editing system 
-    data: { 
-      label: tabTitle, 
-      url: tabUrl,
-      icon: tabIcon,
-      parentid: parentId,
-      tabid: tab.id, 
-      connections: [] //array of node indexes 
-     },
-  },)
-  console.log("after node push for 2nd", nodeslist, edgeslist);
-  if (nodeslist[parentId]) {
-    nodeslist[parentId].data.connections.push(String(num_of_nodes));
-  }
-  //edit the connections of the node to the current node 
-  //MAKJOEAJFD window specific later
-  const edgeIds = new Set();
-  
-  nodeslist.forEach((node) => {
-    node.data.connections.forEach(targetIndex => { // Corrected here
-      const targetNode = nodeslist[targetIndex]; // Ensure nodeslist is used
-      if (!targetNode) return;
-      
-      // build a unique edge id
-      const edgeId = `e${node.id}-${targetNode.id}`;
-  
-      // only add if we haven't seen it before
-      if (!edgeIds.has(edgeId)) {
-        edgeIds.add(edgeId);
-        edgeslist.push({
-          id: edgeId,
-          source: node.id,
-          target: targetNode.id,
-          type: 'smoothstep',   // optional style
-          animated: true        // optional animation
-        });
-      }
-    });
   });
+
+  console.log(`[broadcastGraphUpdate] Window ${windowId} - Nodes (%d):`, nodeslist.length, nodeslist);
+  console.log(`[broadcastGraphUpdate] Window ${windowId} - Edges (%d):`, edgeslist.length, edgeslist);
+
+
 }
+// adds nodes and connection to the global list
+function AnAc(tab, windowId) {
+    initializeWindowData(windowId);
+  
+    const { nodeslist, edgeslist } = windowData[windowId];
+    const tabTitle = tab.title || 'Untitled';
+    const tabUrl = tab.url || 'about:blank';
+    const tabIcon = tab.favIconUrl || '';
+  
+    console.log(`Window ${windowId} - Before adding node`, nodeslist, edgeslist);
+  
+    const newNodeId = nodeslist.length + 1;
+    nodeslist.push({
+      id: String(newNodeId),
+      position: { x: 0, y: 0 },
+      data: {
+        label: tabTitle,
+        url: tabUrl,
+        icon: tabIcon,
+        parentid: parentId,
+        tabid: tab.id,
+        connections: [],
+      },
+    });
+  
+    if (nodeslist[parentId]) {
+      nodeslist[parentId].data.connections.push(String(newNodeId));
+    }
+  
+    const edgeIds = new Set(edgeslist.map((edge) => edge.id));
+    nodeslist.forEach((node) => {
+      node.data.connections.forEach((targetIndex) => {
+        const targetNode = nodeslist[targetIndex];
+        if (!targetNode) return;
+  
+        const edgeId = `e${node.id}-${targetNode.id}`;
+        if (!edgeIds.has(edgeId)) {
+          edgeIds.add(edgeId);
+          edgeslist.push({
+            id: edgeId,
+            source: node.id,
+            target: targetNode.id,
+            type: 'smoothstep',
+            animated: true,
+          });
+        }
+      });
+    });
+  
+    console.log(`Window ${windowId} - After adding node`, nodeslist, edgeslist);
+  }
+
 //This is the thing that opens the side bar
 chrome.runtime.onInstalled.addListener((tab) => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-
+  
 });
 
 
 //WARNING: THIS MIGHT BREAK BECAUSE THESE MIGHT NOT BE MUTALLY EXCLUSIVE 
 //this checks for new tabs opened by the user 
-chrome.tabs.onCreated.addListener(tab => {
-  // get the actual URL (pendingUrl for navigations in flight, otherwise url)
+chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url;
   if (!url) return;
-  console.log("passed first check", nodeslist, edgeslist);
+
+  const windowId = tab.windowId;
+  console.log(`Tab created in window ${windowId}`, tab);
+
   if (programmaticallyCreatedTabs.has(tab.id)) {
-    console.log("Skipping onCreated logic for programmatically created tab:", tab.id);
-    programmaticallyCreatedTabs.delete(tab.id); // Remove it from the set after handling
+    console.log(`Skipping programmatically created tab in window ${windowId}:`, tab.id);
+    programmaticallyCreatedTabs.delete(tab.id);
     return;
   }
 
-  // only count “real” user-opened tabs:
-  // 1) tab.active === true  → it’s immediately shown to the user  
-  // 2) tab.openerTabId === undefined → it wasn’t spawned in the background by another tab
-
   if (tab.url !== 'about:blank' && tab.url !== undefined) {
-    AnAc(tab);
-    broadcastGraphUpdate();  
+    AnAc(tab, windowId);
+    broadcastGraphUpdate(windowId);
   }
 });
 
-
+chrome.windows.onRemoved.addListener((windowId) => {
+  console.log(`Window ${windowId} closed. Cleaning up data.`);
+  delete windowData[windowId];// might want to change this its just creating empty space 
+});
 
 //this checks for background tabs opened by the user 
 // Filter tabs the user opens (not scripts/popups/etc.)
@@ -155,7 +152,7 @@ chrome.tabs.onCreated.addListener((tab) => {
             console.log("already tracked condition met" ,updatedTab.url);
             
           }
-          AnAc(tab);
+          AnAc(tab,wind);
           broadcastGraphUpdate();  
         }
       });
@@ -166,6 +163,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 //On command create new tab 
 function openNewTab() {
+  chrome.windows.getCurrent((currentWindow) => {
   chrome.tabs.create({}, (tab) => {
     if (tab.openerTabId !== undefined || tab.url === 'about:blank') {
       console.log("Filtered out non-user-created or default tab:", tab);
@@ -177,9 +175,10 @@ function openNewTab() {
     console.log("Opened new tab:", tab);
     //edit the connections of the node to the current node 
     //MAKJOEAJFD window specific later
-    AnAc(tab);
-    broadcastGraphUpdate();  
+    AnAc(tab, currentWindow.id);
+    broadcastGraphUpdate(currentWindow.id);  
   });
+});
 }
 
 // Listen for the keyboard command defined in manifest.json//
@@ -213,16 +212,17 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   });
 
   setTimeout(() => {
+    if (!windowData[windowId]) return; 
+    const { nodeslist } = windowData[windowId];
     for (let i = 0; i < nodeslist.length; i++) {
       const node = nodeslist[i];
       if (node.data.tabid === tabId) {
         console.log(`Found a match at index ${i}:`, node);
         parentId = i;
-
       }
     }
   }, 25); // ← adjust delay 
 });
-
+//implement tab removal 
 //logic if the current focus tab is equal to the saved tab id, then that is the current tabs index in the array 
 //implement tab history manager
