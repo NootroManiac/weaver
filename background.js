@@ -14,7 +14,6 @@ function initializeWindowData(windowId) {
     windowData[windowId] = {
       nodeslist: [],
       edgeslist: [],
-      windowId: windowId
     };
   }
 }
@@ -64,6 +63,7 @@ function AnAc(tab, windowId) {
         connections: [],
       },
     });
+
     const currentEdges = new Set(edgeslist.map((edge) => edge.id));
     if (nodeslist[parentId]) {
       nodeslist[parentId].data.connections.push(String(newNodeId));
@@ -76,7 +76,7 @@ function AnAc(tab, windowId) {
           currentEdges.add(edgeId);
           edgeslist.push({
             id: edgeId,
-            source: parentId,
+            source: parentId + 1,
             target: targetNode.id,
             type: 'smoothstep',
             animated: true,
@@ -134,7 +134,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   }
 
   const removedNode = nodeslist[nodeIndex];
-  const parentNodeId = removedNode.data.parentid;
+  const parentNodeId = removedNode.data.parentid + 1;
 
   console.log(`Removing node for tabId ${tabId} in window ${windowId}:`, removedNode);
 
@@ -181,6 +181,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url;
   if (!url) return;
 
+
   const windowId = tab.windowId;
   console.log(`Tab created in window ${windowId}`, tab);
 
@@ -193,19 +194,25 @@ chrome.tabs.onCreated.addListener((tab) => {
   if (tab.url !== 'about:blank' && tab.url !== undefined) {
     AnAc(tab, windowId);
     broadcastGraphUpdate(windowId);
-    
   }
   if (!windowData[windowId]) return; 
+  //not window specific
 
   const { nodeslist } = windowData[windowId];
-
+  console.log("current node list", nodeslist); 
+  console.log("current tabID", tab.id);
+  parentId = nodeslist.findIndex((node) => node.data.tabid === tab.id);
+  
+  console.log("current parent tab index", parentId);
+  /*
   for (let i = 0; i < nodeslist.length; i++) {
     const node = nodeslist[i];
     if (node.data.tabid === tabId) {
-      console.log(`Found a match at index ${i}:`, node);
+      console.log(`Found a Smatch at index ${i}:`, node);
       parentId = i;
     }
   }
+    */
 });
 
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -287,7 +294,7 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   // windowId = ID of the window containing that tab
   // windowspecific 
   // wait 
-  /*
+
   //setTimeout(() => {
     if (!windowData[windowId]) return; 
 
@@ -301,7 +308,7 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
       }
     }
   //}, 100); // ← adjust delay 
-  */
+  
   chrome.tabs.get(tabId, (tab) => {
     console.log('Switched to tab:', tabId);
     console.log('URL is now:', tab.url);
