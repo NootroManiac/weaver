@@ -473,3 +473,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // Indicate that the response will be sent asynchronously
   }
 });
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const windowId = tab.windowId;
+  initializeWindowData(windowId);
+
+  if (!windowData[windowId]) return;
+
+  const { nodeslist } = windowData[windowId];
+
+  // Find the node corresponding to the updated tab
+  const nodeIndex = nodeslist.findIndex((node) => node.data.tabid === tabId);
+
+  if (nodeIndex === -1) {
+    console.warn(`Node for tabId ${tabId} not found in window ${windowId}`);
+    return;
+  }
+
+  const node = nodeslist[nodeIndex];
+
+  // Update the node's label if the title or URL has changed
+  if (changeInfo.title || changeInfo.url) {
+    const updatedLabel = changeInfo.title || tab.title || 'Untitled';
+    const updatedUrl = changeInfo.url || tab.url || 'about:blank';
+
+    windowData[windowId].nodeslist[nodeIndex].data.label = `${updatedLabel}`;
+
+    console.log(`Node updated for tabId ${tabId}:`, node);
+
+    // Broadcast the updated graph to the front-end
+    broadcastGraphUpdate(windowId);
+  }
+});
