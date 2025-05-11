@@ -2,6 +2,7 @@ let lastNodeId = null;
 let userCreatedTabs = [];
 let num_of_nodes = 1; //index 
 let current_selected = 1; 
+let parentIndex = 1; 
 let parentId = 1; 
 let root_node = 1; 
 let tab_id_list = [];
@@ -23,9 +24,47 @@ let programmaticallyCreatedTabs = new Set();
 //each window has their own nodes list
 //maybe implement a window data type 
 //add image, clickable url to data, and title 
+// Save windowData to local storage
+/*
+function saveWindowDataToStorage() {
+  chrome.storage.local.set({ windowData }, () => {
+    console.log("Window data saved to local storage:", windowData);
+  });
+}
+
+// Load windowData from local storage
+function loadWindowDataFromStorage() {
+  chrome.storage.local.get(["windowData"], (result) => {
+    if (result.windowData && Object.keys(result.windowData).length > 0) {
+      windowData = result.windowData;
+      console.log("Window data loaded from local storage:", windowData);
+    } else {
+      console.log("No window data found in local storage. Returning without loading.");
+      return; // Exit the function if no data is available
+    }
+  });
+}
+
+// Initialize data on extension startup
+chrome.runtime.onStartup.addListener(() => {
+  loadWindowDataFromStorage();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  loadWindowDataFromStorage();
+});
+
+// Example: Clear data when a window is closed
+chrome.windows.onRemoved.addListener((windowId) => {
+  console.log(`Window ${windowId} closed. Cleaning up data.`);
+  delete windowData[windowId];
+  saveWindowDataToStorage(); // Save updated data after deletion
+});
+*/
 
 function broadcastGraphUpdate(windowId) {
   if (!windowData[windowId]) return;
+  
 
   const { nodeslist, edgeslist } = windowData[windowId];
   chrome.runtime.sendMessage({
@@ -36,21 +75,32 @@ function broadcastGraphUpdate(windowId) {
   console.log(`[broadcastGraphUpdate] Window ${windowId} - Nodes (%d):`, nodeslist.length, nodeslist);
   console.log(`[broadcastGraphUpdate] Window ${windowId} - Edges (%d):`, edgeslist.length, edgeslist);
 
-
+  //saveWindowDataToStorage();
 }
-
+//im going to crash out were are switching parentindex to the actual id of the parent not a index
 // adds nodes and connection to the global list
 function AnAc(tab, windowId) {
     initializeWindowData(windowId);
-  
+    /*
+    if (windowData[windowId].nodeslist.length === 0){
+        loadWindowDataFromStorage();
+    }
+    */
     const { nodeslist, edgeslist } = windowData[windowId];
     const tabTitle = tab.title || 'Untitled';
     const tabUrl = tab.url || 'about:blank';
     const tabIcon = tab.favIconUrl || '';
   
-    console.log(`Window ${windowId} - Before adding node`, nodeslist, edgeslist);
+    //console.log(`Window ${windowId} - Before adding node`, nodeslist, edgeslist);
     
-    const newNodeId = nodeslist.length + 1;
+    const newNodeId = nodeslist.length + 1; //fix repeats
+    if (nodeslist.find((node) => node.id === newNodeId)){
+      while (nodeslist.find((node) => node.id === newNodeId)) // might want to update this 
+      {
+        newNodeId++;
+      }
+    }
+    
     nodeslist.push({
       id: String(newNodeId),
       position: { x: 0, y: 0 },
@@ -58,32 +108,60 @@ function AnAc(tab, windowId) {
         label: tabTitle,
         url: tabUrl,
         icon: tabIcon,
-        parentid: parentId,
+        parentid: parentIndex, //this is a id 
         tabid: tab.id,
         connections: [],
       },
     });
-
+    //nodeslist.findIndex((nodes)); //its opposite day
+    //parentID IS not the Parents ID value It is is index value 
+    let parentId = nodeslist.findIndex((node) => parentIndex === node.id);
     const currentEdges = new Set(edgeslist.map((edge) => edge.id));
     if (nodeslist[parentId]) {
       nodeslist[parentId].data.connections.push(String(newNodeId));
+      let new_node_index  = nodeslist[parentId].data.connections.length - 1; // gets the newly added node
+      let target_index = nodeslist.findIndex((nodes) => nodes.id === nodeslist[parentId].data.connections[new_node_index]);
+      let targetNode = nodeslist[target_index];
+      let parent_id = nodeslist[parentId].id;
+
+      const edgeId = `e${parent_id}-${targetNode.id}`;
+      if (!currentEdges.has(edgeId)) {
+        currentEdges.add(edgeId);
+
+        edgeslist.push({
+          id: edgeId,
+          source: parent_id,
+          target: targetNode.id,
+          type: 'smoothstep',
+          animated: true,
+        });
+      }
+      /*
       nodeslist[parentId].data.connections.forEach((targetIndex) => {
-        const targetNode = nodeslist[targetIndex-1];
+        let target_index = nodeslist.findIndex((nodeId) => nodeslist[parentId].data.connection.findIndex((connections) => connections === nodeId.id));
+        
+        const targetNode = nodeslist[target_index];
+        let parent_id = nodeslist[parentId].id; 
+        console.log("current target node", targetNode);
         if (!targetNode) return;
-  
-        const edgeId = `e${parentId}-${targetNode.id}`;
+
+        const edgeId = `e${parent_id}-${targetNode.id}`;
+
         if (!currentEdges.has(edgeId)) {
           currentEdges.add(edgeId);
+
           edgeslist.push({
             id: edgeId,
-            source: parentId + 1,
+            source: parent_id,
             target: targetNode.id,
             type: 'smoothstep',
             animated: true,
           });
         }
+
       });
-      console.log("current", nodeslist, edgeslist);
+      */
+      //console.log("current", nodeslist, edgeslist);
     }
   
     const edgeIds = new Set(edgeslist.map((edge) => edge.id));
@@ -117,12 +195,17 @@ chrome.tabs.onRemoved.addListener( (tab) => {
 });
 */
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+
   const windowId = removeInfo.windowId;
 
   if (!windowData[windowId]) {
     return;
   }
-
+  /*
+  if (windowData[windowId].nodeslist.length === 0){
+    loadWindowDataFromStorage();
+  }
+  */
   const { nodeslist, edgeslist} = windowData[windowId];
 
   // Find the index of the node corresponding to the removed tab
@@ -132,24 +215,30 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     console.warn(`Node for tabId ${tabId} not found in window ${windowId}`);
     return;
   }
-
+  let parentnodeId = nodeslist.findIndex((node) => node.id === nodeslist[nodeIndex].data.parentid);
   const removedNode = nodeslist[nodeIndex];
-  const parentNodeId = removedNode.data.parentid + 1;
+  const parentNode = nodeslist[parentnodeId];
+  if (typeof parentnodeId == "undefined"){
+    console.log("what? I dont know if this is possible"); 
+    return; 
+  }
+  
+  //console.log(`Removing node for tabId ${tabId} in window ${windowId}:`, removedNode);
 
-  console.log(`Removing node for tabId ${tabId} in window ${windowId}:`, removedNode);
-
-  // Reassign connections to the parent node or the node above
-  if (parentNodeId) {
-    const parentNode = nodeslist.find((node) => node.id === parentNodeId);
-
+  // Reassign connections to the parent node or the node aboves
+  //removed node in parent connection 
+    let removed_node_pcindx = parentNode.data.connections.findIndex((connection) => removedNode.id === String(connection)); //this can be avoided if it allow the program to intentionally runtime error and then have error handling code 
+    if (removed_node_pcindx !== -1){
+      parentNode.data.connections.splice(removed_node_pcindx, 1);
+    }
     if (parentNode) {
       // Move connections from the removed node to its parent node
       removedNode.data.connections.forEach((connectionId) => {
         if (!parentNode.data.connections.includes(connectionId)) {
           parentNode.data.connections.push(connectionId);
+
         }
       });
-    }
   } else if (nodeIndex > 0) {
     // If no parent node, assign connections to the node above
     const nodeAbove = nodeslist[nodeIndex - 1];
@@ -161,13 +250,41 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   }
 
   // Remove the edges of the recently deleted node from the edgeslist
-  nodeslist.splice(nodeIndex, 1);
   windowData[windowId].edgeslist = edgeslist.filter(
     (edge) => edge.source !== removedNode.id && edge.target !== removedNode.id
   );
-  console.log(`Node for tabId ${tabId} removed. Updated nodeslist:`, nodeslist);
 
+  console.log(`Node for tabId ${tabId} removed. Updated nodeslist:`, nodeslist);
+  const currentEdges = new Set(edgeslist.map((edge) => edge.id));
+  //make new edges with the updated connections list 
+  nodeslist[nodeIndex].data.connections.forEach((targetIndex) => {
+    let target_index = nodeslist.findIndex((nodeId) => String(targetIndex) === nodeId.id);
+
+    const targetNode = nodeslist[target_index];
+
+
+    let parent_id = nodeslist[parentnodeId].id; 
+    console.log("current target node", targetNode);
+    if (!targetNode) return;
+
+    const edgeId = `e${parent_id}-${targetNode.id}`;
+    console.log("current edge id:", edgeId );
+    if (!currentEdges.has(edgeId)) {
+      console.log
+      currentEdges.add(edgeId);
+
+      windowData[windowId].edgeslist.push({
+        id: edgeId,
+        source: parent_id,
+        target: targetNode.id,
+        type: 'smoothstep',
+        animated: true,
+      });
+    }
+    console.log("current edges list", edgeslist);
+  });
   // Broadcast the updated graph
+  nodeslist.splice(nodeIndex, 1);
   broadcastGraphUpdate(windowId);
 
   //remove connections from connection list 
@@ -177,6 +294,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 // AK BECAUSE THESE MIGHT NOT BE MUTALLY EXCLUSIVE 
 //this checks for new tabs opened by the user 
 chrome.tabs.onCreated.addListener((tab) => {
+  
   //settimeOut()
   const url = tab.pendingUrl || tab.url;
   if (!url) return;
@@ -184,7 +302,11 @@ chrome.tabs.onCreated.addListener((tab) => {
 
   const windowId = tab.windowId;
   console.log(`Tab created in window ${windowId}`, tab);
-
+  /*
+  if (windowData[windowId].nodeslist.length === 0){
+    loadWindowDataFromStorage();
+}
+    */
   if (programmaticallyCreatedTabs.has(tab.id)) {
     console.log(`Skipping programmatically created tab in window ${windowId}:`, tab.id);
     programmaticallyCreatedTabs.delete(tab.id);
@@ -194,16 +316,18 @@ chrome.tabs.onCreated.addListener((tab) => {
   if (tab.url !== 'about:blank' && tab.url !== undefined) {
     AnAc(tab, windowId);
     broadcastGraphUpdate(windowId);
+    
+    const { nodeslist } = windowData[windowId];
+    //console.log("current node list", nodeslist); 
+    //console.log("current tabID", tab.id);
+    parentIndex = nodeslist[nodeslist.findIndex((node) => node.data.tabid === tab.id)].id;
+    //console.log("current parent tab index", parentId);
   }
-  if (!windowData[windowId]) return; 
+  if (!windowData[windowId]) {
+    return;
+  } 
   //not window specific
 
-  const { nodeslist } = windowData[windowId];
-  console.log("current node list", nodeslist); 
-  console.log("current tabID", tab.id);
-  parentId = nodeslist.findIndex((node) => node.data.tabid === tab.id);
-  
-  console.log("current parent tab index", parentId);
   /*
   for (let i = 0; i < nodeslist.length; i++) {
     const node = nodeslist[i];
@@ -225,7 +349,14 @@ chrome.windows.onRemoved.addListener((windowId) => {
 chrome.tabs.onCreated.addListener((tab) => {
   // Only proceed if it's not active (i.e., opened in background)
   const windowId = tab.windowId;
+  const {nodeslist, edgeslist} = windowData[windowId];
+  /*
+    if (windowData[windowId].nodeslist.length === 0){
+    loadWindowDataFromStorage();
+  }
+  */
   console.log("initial ", nodeslist, edgeslist);
+  
   if (!tab.active && !tab.openerTabId && tab.pendingUrl && tab.url !== 'about:blank') {
     // Defer briefly to allow URL to load
     console.log("pass first check for pending ", nodeslist, edgeslist);
@@ -277,7 +408,7 @@ chrome.commands.onCommand.addListener((command) => {
     isCommandPressed = true; 
     openNewTab();
     broadcastGraphUpdate();  
-    console.log("working", nodeslist, edgeslist);
+    //console.log("working", nodeslist, edgeslist);
   }
   isCommandPressed = false; 
 });
@@ -304,7 +435,7 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
       const node = nodeslist[i];
       if (node.data.tabid === tabId) {
         console.log(`Found a match at index ${i}:`, node);
-        parentId = i;
+        parentIndex = nodeslist[i].id;
       }
     }
   //}, 100); // ← adjust delay 
