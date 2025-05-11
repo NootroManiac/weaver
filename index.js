@@ -21,6 +21,7 @@ import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
 import { createRoot } from 'react-dom/client';
 
+ 
 const container = document.getElementById('root');
 const root = createRoot(container);
  root.render(
@@ -99,7 +100,6 @@ export function getLayoutedElements(origNodes, origEdges, direction = 'TB') {
 //implement a initial edges constructor using the data from the nodes 
 
 
-
 export default function LayoutFlow() {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
@@ -149,6 +149,42 @@ export default function LayoutFlow() {
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, [updateFlow]);
 
+  const onNodeClick = (event, node) => {
+    console.log('Node clicked:', node);
+    // Add your custom logic here, e.g., open a modal, update state, etc.
+    if (node.data && node.data.tabid) {
+      chrome.runtime.sendMessage(
+        { type: "FOCUS_TAB", tabId: node.data.tabid },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error sending message to background script:", chrome.runtime.lastError);
+          } else {
+            console.log("Message sent to background script to focus tab:", node.data.tabid);
+          }
+        }
+      );
+    }
+  };
+  
+  
+  useCallback((event, node) => {
+    console.log("Node clicked:");
+    /*
+    // Send a message to the background script with the tabId
+    if (node.data && node.data.tabid) {
+      chrome.runtime.sendMessage(
+        { type: "FOCUS_TAB", tabId: node.data.tabid },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error sending message to background script:", chrome.runtime.lastError);
+          } else {
+            console.log("Message sent to background script to focus tab:", node.data.tabid);
+          }
+        }
+      );
+    }*/
+  }, []);
+  
 /*
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -207,6 +243,7 @@ export default function LayoutFlow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         fitView
       >
         <MiniMap />

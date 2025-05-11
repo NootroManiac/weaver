@@ -25,7 +25,6 @@ let programmaticallyCreatedTabs = new Set();
 //maybe implement a window data type 
 //add image, clickable url to data, and title 
 // Save windowData to local storage
-/*
 function saveWindowDataToStorage() {
   chrome.storage.local.set({ windowData }, () => {
     console.log("Window data saved to local storage:", windowData);
@@ -47,10 +46,16 @@ function loadWindowDataFromStorage() {
 
 // Initialize data on extension startup
 chrome.runtime.onStartup.addListener(() => {
+  chrome.storage.local.clear(() => {
+    console.log("Local storage cleared on startup.");
+  });
   loadWindowDataFromStorage();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.clear(() => {
+    console.log("Local storage cleared on startup.");
+  });
   loadWindowDataFromStorage();
 });
 
@@ -60,7 +65,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
   delete windowData[windowId];
   saveWindowDataToStorage(); // Save updated data after deletion
 });
-*/
+
 
 function broadcastGraphUpdate(windowId) {
   if (!windowData[windowId]) return;
@@ -75,17 +80,15 @@ function broadcastGraphUpdate(windowId) {
   console.log(`[broadcastGraphUpdate] Window ${windowId} - Nodes (%d):`, nodeslist.length, nodeslist);
   console.log(`[broadcastGraphUpdate] Window ${windowId} - Edges (%d):`, edgeslist.length, edgeslist);
 
-  //saveWindowDataToStorage();
+  saveWindowDataToStorage();
 }
 //im going to crash out were are switching parentindex to the actual id of the parent not a index
 // adds nodes and connection to the global list
 function AnAc(tab, windowId) {
     initializeWindowData(windowId);
-    /*
     if (windowData[windowId].nodeslist.length === 0){
         loadWindowDataFromStorage();
     }
-    */
     const { nodeslist, edgeslist } = windowData[windowId];
     const tabTitle = tab.title || 'Untitled';
     const tabUrl = tab.url || 'about:blank';
@@ -93,12 +96,12 @@ function AnAc(tab, windowId) {
   
     //console.log(`Window ${windowId} - Before adding node`, nodeslist, edgeslist);
     
-    const newNodeId = nodeslist.length + 1; //fix repeats
-    if (nodeslist.find((node) => node.id === newNodeId)){
-      while (nodeslist.find((node) => node.id === newNodeId)) // might want to update this 
-      {
+    let newNodeId = nodeslist.length + 1; //fix repeats
+    if (nodeslist.some((node) => node.id === String(newNodeId))){
+      console.log("message");
+      do{
         newNodeId++;
-      }
+      } while(nodeslist.some((node) => node.id === String(newNodeId)));
     }
     
     nodeslist.push({
@@ -197,15 +200,14 @@ chrome.tabs.onRemoved.addListener( (tab) => {
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
   const windowId = removeInfo.windowId;
-
+  initializeWindowData(windowId);
   if (!windowData[windowId]) {
     return;
   }
-  /*
+  
   if (windowData[windowId].nodeslist.length === 0){
     loadWindowDataFromStorage();
   }
-  */
   const { nodeslist, edgeslist} = windowData[windowId];
 
   // Find the index of the node corresponding to the removed tab
@@ -235,8 +237,13 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
       // Move connections from the removed node to its parent node
       removedNode.data.connections.forEach((connectionId) => {
         if (!parentNode.data.connections.includes(connectionId)) {
-          parentNode.data.connections.push(connectionId);
+          windowData[windowId].nodeslist[parentnodeId].data.connections.push(connectionId);
 
+          console.log("Before", windowData[windowId].nodeslist);
+
+          let connections_index = nodeslist.findIndex((node) => connectionId === node.id);
+          windowData[windowId].nodeslist[connections_index].data.parentid = parentnodeId;
+          console.log("Before", windowData[windowId].nodeslist);
         }
       });
   } else if (nodeIndex > 0) {
@@ -298,15 +305,14 @@ chrome.tabs.onCreated.addListener((tab) => {
   //settimeOut()
   const url = tab.pendingUrl || tab.url;
   if (!url) return;
-
+  
 
   const windowId = tab.windowId;
   console.log(`Tab created in window ${windowId}`, tab);
-  /*
+  initializeWindowData(windowId);
   if (windowData[windowId].nodeslist.length === 0){
     loadWindowDataFromStorage();
 }
-    */
   if (programmaticallyCreatedTabs.has(tab.id)) {
     console.log(`Skipping programmatically created tab in window ${windowId}:`, tab.id);
     programmaticallyCreatedTabs.delete(tab.id);
@@ -350,11 +356,10 @@ chrome.tabs.onCreated.addListener((tab) => {
   // Only proceed if it's not active (i.e., opened in background)
   const windowId = tab.windowId;
   const {nodeslist, edgeslist} = windowData[windowId];
-  /*
+  initializeWindowData(windowId);
     if (windowData[windowId].nodeslist.length === 0){
     loadWindowDataFromStorage();
   }
-  */
   console.log("initial ", nodeslist, edgeslist);
   
   if (!tab.active && !tab.openerTabId && tab.pendingUrl && tab.url !== 'about:blank') {
@@ -427,8 +432,9 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   // wait 
 
   //setTimeout(() => {
+    initializeWindowData(windowId);
     if (!windowData[windowId]) return; 
-
+  
     const { nodeslist } = windowData[windowId];
 
     for (let i = 0; i < nodeslist.length; i++) {
@@ -441,9 +447,9 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   //}, 100); // ← adjust delay 
   
   chrome.tabs.get(tabId, (tab) => {
-    console.log('Switched to tab:', tabId);
-    console.log('URL is now:', tab.url);
-    console.log('Title:', tab.title);
+    //console.log('Switched to tab:', tabId);
+    //console.log('URL is now:', tab.url);
+    //console.log('Title:', tab.title);
     // …do whatever you need with the new active tab
   });
 
@@ -451,3 +457,19 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
 //implement tab removal 
 //logic if the current focus tab is equal to the saved tab id, then that is the current tabs index in the array 
 //implement tab history manager
+//implement
+// Listen for messages from index.js
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "FOCUS_TAB") {
+    chrome.tabs.update(msg.tabId, { active: true }, (tab) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error focusing tab:", chrome.runtime.lastError);
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        console.log(`Focused tab with ID: ${msg.tabId}`);
+        sendResponse({ success: true });
+      }
+    });
+    return true; // Indicate that the response will be sent asynchronously
+  }
+});

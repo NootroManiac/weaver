@@ -43718,6 +43718,39 @@ function LayoutFlow() {
       return chrome.runtime.onMessage.removeListener(listener);
     };
   }, [updateFlow]);
+  var onNodeClick = function onNodeClick(event, node) {
+    console.log('Node clicked:', node);
+    // Add your custom logic here, e.g., open a modal, update state, etc.
+    if (node.data && node.data.tabid) {
+      chrome.runtime.sendMessage({
+        type: "FOCUS_TAB",
+        tabId: node.data.tabid
+      }, function (response) {
+        if (chrome.runtime.lastError) {
+          console.error("Error sending message to background script:", chrome.runtime.lastError);
+        } else {
+          console.log("Message sent to background script to focus tab:", node.data.tabid);
+        }
+      });
+    }
+  };
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (event, node) {
+    console.log("Node clicked:");
+    /*
+    // Send a message to the background script with the tabId
+    if (node.data && node.data.tabid) {
+      chrome.runtime.sendMessage(
+        { type: "FOCUS_TAB", tabId: node.data.tabid },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error sending message to background script:", chrome.runtime.lastError);
+          } else {
+            console.log("Message sent to background script to focus tab:", node.data.tabid);
+          }
+        }
+      );
+    }*/
+  }, []);
 
   /*
     const onConnect = useCallback(
@@ -43778,6 +43811,7 @@ function LayoutFlow() {
     onNodesChange: onNodesChange,
     onEdgesChange: onEdgesChange,
     onConnect: onConnect,
+    onNodeClick: onNodeClick,
     fitView: true
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(reactflow__WEBPACK_IMPORTED_MODULE_5__.MiniMap, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(reactflow__WEBPACK_IMPORTED_MODULE_6__.Controls, null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(reactflow__WEBPACK_IMPORTED_MODULE_7__.Background, {
     variant: "dots",
