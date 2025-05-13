@@ -231,7 +231,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   //removed node in parent connection 
     let removed_node_pcindx = parentNode.data.connections.findIndex((connection) => removedNode.id === String(connection)); //this can be avoided if it allow the program to intentionally runtime error and then have error handling code 
     if (removed_node_pcindx !== -1){
-      parentNode.data.connections.splice(removed_node_pcindx, 1);
+      parentNode.data.connections.splice(removed_node_pcindx, 1); //removal
     }
     if (parentNode) {
       // Move connections from the removed node to its parent node
@@ -242,7 +242,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
           console.log("Before", windowData[windowId].nodeslist);
 
           let connections_index = nodeslist.findIndex((node) => connectionId === node.id);
-          windowData[windowId].nodeslist[connections_index].data.parentid = parentnodeId;
+          windowData[windowId].nodeslist[connections_index].data.parentid = windowData[windowId].nodeslist[parentnodeId].id;
           console.log("Before", windowData[windowId].nodeslist);
         }
       });
@@ -263,6 +263,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
   console.log(`Node for tabId ${tabId} removed. Updated nodeslist:`, nodeslist);
   const currentEdges = new Set(edgeslist.map((edge) => edge.id));
+
   //make new edges with the updated connections list 
   nodeslist[nodeIndex].data.connections.forEach((targetIndex) => {
     let target_index = nodeslist.findIndex((nodeId) => String(targetIndex) === nodeId.id);
