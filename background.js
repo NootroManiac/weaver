@@ -2,7 +2,7 @@ let lastNodeId = null;
 let userCreatedTabs = [];
 let num_of_nodes = 1; //index 
 let current_selected = 1; 
-let parentIndex = 1; 
+let parentIndex = 1; //parent index is not parent index its parent id (i forgot to change the name)
 let parentId = 1; 
 let root_node = 1; 
 let tab_id_list = [];
@@ -32,31 +32,35 @@ function saveWindowDataToStorage() {
 }
 
 // Load windowData from local storage
-function loadWindowDataFromStorage() {
-  chrome.storage.local.get(["windowData"], (result) => {
-    if (result.windowData && Object.keys(result.windowData).length > 0) {
-      windowData = result.windowData;
-      console.log("Window data loaded from local storage:", windowData);
-    } else {
-      console.log("No window data found in local storage. Returning without loading.");
-      return; // Exit the function if no data is available
-    }
+function loadWindowDataFromStorageAsync() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["windowData"], (result) => {
+      if (result.windowData && Object.keys(result.windowData).length > 0) {
+        windowData = result.windowData;
+        console.log("Window data loaded from local storage:", windowData);
+      } else {
+        console.log("No window data found in local storage. Returning without loading.");
+      }
+      resolve();
+    });
   });
 }
 
 // Initialize data on extension startup
 chrome.runtime.onStartup.addListener(() => {
+  /*
   chrome.storage.local.clear(() => {
     console.log("Local storage cleared on startup.");
   });
   loadWindowDataFromStorage();
+  */
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.clear(() => {
     console.log("Local storage cleared on startup.");
   });
-  loadWindowDataFromStorage();
+  loadWindowDataFromStorage(); //
 });
 
 // Example: Clear data when a window is closed
@@ -84,11 +88,11 @@ function broadcastGraphUpdate(windowId) {
 }
 //im going to crash out were are switching parentindex to the actual id of the parent not a index
 // adds nodes and connection to the global list
-function AnAc(tab, windowId) {
+async function AnAc(tab, windowId) {
     initializeWindowData(windowId);
-    if (windowData[windowId].nodeslist.length === 0){
-        loadWindowDataFromStorage();
-    }
+    if (windowData[windowId].nodeslist.length === 0) {
+    await loadWindowDataFromStorageAsync();
+  }
     const { nodeslist, edgeslist } = windowData[windowId];
     const tabTitle = tab.title || 'Untitled';
     const tabUrl = tab.url || 'about:blank';
@@ -118,6 +122,7 @@ function AnAc(tab, windowId) {
     });
     //nodeslist.findIndex((nodes)); //its opposite day
     //parentID IS not the Parents ID value It is is index value 
+    //parentindex is the parent ID 
     let parentId = nodeslist.findIndex((node) => parentIndex === node.id);
     const currentEdges = new Set(edgeslist.map((edge) => edge.id));
     if (nodeslist[parentId]) {
@@ -197,7 +202,7 @@ chrome.tabs.onRemoved.addListener( (tab) => {
 }
 });
 */
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 
   const windowId = removeInfo.windowId;
   initializeWindowData(windowId);
@@ -206,7 +211,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   }
   
   if (windowData[windowId].nodeslist.length === 0){
-    loadWindowDataFromStorage();
+    await loadWindowDataFromStorage(); //check
   }
   const { nodeslist, edgeslist} = windowData[windowId];
 
@@ -301,7 +306,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 //WARNING: THIS MIGHT BRE
 // AK BECAUSE THESE MIGHT NOT BE MUTALLY EXCLUSIVE 
 //this checks for new tabs opened by the user 
-chrome.tabs.onCreated.addListener((tab) => {
+chrome.tabs.onCreated.addListener(async (tab) => {
   
   //settimeOut()
   const url = tab.pendingUrl || tab.url;
@@ -310,10 +315,10 @@ chrome.tabs.onCreated.addListener((tab) => {
 
   const windowId = tab.windowId;
   console.log(`Tab created in window ${windowId}`, tab);
-  initializeWindowData(windowId);
-  if (windowData[windowId].nodeslist.length === 0){
-    loadWindowDataFromStorage();
-}
+  //initializeWindowData(windowId);
+  //if (windowData[windowId].nodeslist.length === 0){
+    //loadWindowDataFromStorage(); //check
+//}
   if (programmaticallyCreatedTabs.has(tab.id)) {
     console.log(`Skipping programmatically created tab in window ${windowId}:`, tab.id);
     programmaticallyCreatedTabs.delete(tab.id);
@@ -321,7 +326,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 
   if (tab.url !== 'about:blank' && tab.url !== undefined) {
-    AnAc(tab, windowId);
+    await AnAc(tab, windowId);
     broadcastGraphUpdate(windowId);
     
     const { nodeslist } = windowData[windowId];
@@ -357,10 +362,10 @@ chrome.tabs.onCreated.addListener((tab) => {
   // Only proceed if it's not active (i.e., opened in background)
   const windowId = tab.windowId;
   const {nodeslist, edgeslist} = windowData[windowId];
-  initializeWindowData(windowId);
-    if (windowData[windowId].nodeslist.length === 0){
-    loadWindowDataFromStorage();
-  }
+  //initializeWindowData(windowId);
+    //if (windowData[windowId].nodeslist.length === 0){
+    //loadWindowDataFromStorage(); //check
+  //}
   console.log("initial ", nodeslist, edgeslist);
   
   if (!tab.active && !tab.openerTabId && tab.pendingUrl && tab.url !== 'about:blank') {
@@ -389,7 +394,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 });
 //On command create new tab 
-function openNewTab() {
+function openNewTab() { // load from current 
   chrome.windows.getCurrent((currentWindow) => {
   chrome.tabs.create({}, (tab) => {
     if (tab.openerTabId !== undefined || tab.url === 'about:blank') {
@@ -431,7 +436,7 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   // windowId = ID of the window containing that tab
   // windowspecific 
   // wait 
-
+  console.log("window change detection?");
   //setTimeout(() => {
     initializeWindowData(windowId);
     if (!windowData[windowId]) return; 
@@ -506,3 +511,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     broadcastGraphUpdate(windowId);
   }
 });
+//add node tree update when window changed
+/*
+chrome.windows.onFocusedChanged.addListener((windowId) =>{
+  if (!windowData[windowId]) {
+    
+  };
+//
+
+});
+*/
